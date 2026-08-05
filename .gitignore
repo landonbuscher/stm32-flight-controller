@@ -1,0 +1,10 @@
+# Build folders
+Debug/
+Release/
+
+# STM32CubeIDE settings
+.settings/
+.metadata/
+*.launch
+.osx.project
+

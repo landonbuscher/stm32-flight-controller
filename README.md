@@ -1,7 +1,7 @@
 # STM32 Flight Controller - Bare-Metal Firmware
 Attitude estimation and motor control firmware for a quadcopter flight controller, written exclusively by reference of data sheets and reference manuals with no HAL abstraction.
 
-![Test bench setup including drone and flight controller](assets/board.jpg)
+![Test bench setup including drone and flight controller](assets/board.JPG)
 
 ***
 

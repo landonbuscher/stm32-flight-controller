@@ -54,3 +54,20 @@ void motor_global_output(float percent) {
 	TIM4->CCR3 = (uint16_t)(percent*TIM4->ARR);
 	TIM4->CCR4 = (uint16_t)(percent*TIM4->ARR);
 }
+
+//Sets output for one specific motor
+void motor_output(motor_position_t motor, float percent) {
+	if (percent>1) percent=1;
+	if (percent<0) percent=0;
+	if (motor<0 || motor>3) motor=0;
+
+	volatile uint32_t* CCR;
+	switch (motor) {
+		case FL: CCR = &TIM4->CCR1; break;
+		case FR: CCR = &TIM4->CCR2; break;
+		case RR: CCR = &TIM4->CCR3; break;
+		case RL: CCR = &TIM4->CCR4; break;
+	}
+
+	*CCR = (uint16_t)(percent*TIM4->ARR);
+}

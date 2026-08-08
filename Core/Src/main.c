@@ -46,6 +46,10 @@ void TIM2_IRQHandler(void) {
 	}
 }
 
+void USART1_IRQHandler(void) { usart_rx(); }
+
+void DMA2_Stream5_IRQHandler(void) { usart_rx(); }
+
 int main(void) {
 	//POWER ON & CONFIGURATION
 	clock_init(); //Enable 84MHz PLL SYSCLK
@@ -54,22 +58,29 @@ int main(void) {
 	lsm6dsr_config(); //Configure IMU
 	usart_init(); //Enable USART
 	motor_init(); //Enable + configure motor output
-	usart_print("# Power On & Configuration Complete\n");
+
+	const char pwr_msg[] = "# Power On & Configuration Complete\n";
+	usart_tx((uint8_t*)pwr_msg, sizeof(pwr_msg)-1);
 
 	//STARTUP CALIBRATION
 	lsm6dsr_calibration();
-	usart_print("# Calibration Complete\n\n");
+	const char calib_msg[] = "# Calibration Complete\n";
+	usart_tx((uint8_t*)calib_msg, sizeof(calib_msg)-1);
 
 	//START LOGGING
 	timer_init(); //Enable control loop and start recording data
+
+//	motor_output(FR, 0.1);
 
 	while (1) {
 		if (log_ready) {
 			//Send pitch and roll data via USART
 			log_ready = 0;
-		    char str[128];
-		    snprintf(str, 128, "%lu %.2f %.2f\n", systick_get_ms(), tx, ty);
-		    usart_print(str);
+		    static char str[80];
+		    uint16_t len = snprintf(str, 80, "%lu %.2f %.2f\n", systick_get_ms(), tx, ty);
+		    if (len<0) continue;
+		    if (len>80) len = 80;
+		    usart_tx((uint8_t*)str, len);
 		}
 		__WFI();
 	}

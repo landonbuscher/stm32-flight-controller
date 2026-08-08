@@ -8,3 +8,5 @@ Release/
 *.launch
 .osx.project
 
+# Project Files
+Core/Src/testing.c

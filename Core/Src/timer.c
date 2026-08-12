@@ -10,6 +10,7 @@ void timer_init(void) {
 	TIM2->ARR = 41999;
 	TIM2->DIER |= TIM_DIER_UIE; //enable interrupts on overflow
 	TIM2->EGR |= TIM_EGR_UG;
+	TIM2->SR = ~TIM_SR_UIF;
 
 	//Enable TIM2 and interrupts
 	NVIC_SetPriority(TIM2_IRQn, 0);

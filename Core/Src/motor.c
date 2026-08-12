@@ -47,6 +47,7 @@ void motor_init(void) {
 
 //Send equal output to all motors (debugging)
 void motor_global_output(float percent) {
+	percent /= 100;
 	if (percent>1) percent=1;
 	if (percent<0) percent=0;
 	TIM4->CCR1 = (uint16_t)(percent*TIM4->ARR);
@@ -57,6 +58,7 @@ void motor_global_output(float percent) {
 
 //Sets output for one specific motor
 void motor_output(motor_position_t motor, float percent) {
+	percent /= 100;
 	if (percent>1) percent=1;
 	if (percent<0) percent=0;
 	if (motor<0 || motor>3) motor=0;
@@ -70,4 +72,21 @@ void motor_output(motor_position_t motor, float percent) {
 	}
 
 	*CCR = (uint16_t)(percent*TIM4->ARR);
+}
+
+static motor_t motors[4] = {
+		{.position=FL, .output=0.0f},
+		{.position=FR, .output=0.0f},
+		{.position=RR, .output=0.0f},
+		{.position=RL, .output=0.0f},
+};
+
+motor_t* motor_get(motor_position_t motor) {
+	switch (motor) {
+		case FL: return &motors[0];
+		case FR: return &motors[1];
+		case RR: return &motors[2];
+		case RL: return &motors[3];
+	}
+	return &motors[0];
 }

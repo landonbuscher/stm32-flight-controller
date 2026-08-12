@@ -10,19 +10,20 @@
 #include "usart.h"
 #include "systick.h"
 #include "motor.h"
+#include "pid.h"
 
 //CONSTANTS
 #define DEG_TO_RAD (3.14159265f/180.0f)
-#define DT (1.0f/1005.0f) //Control timer set to 1000Hz; True measured is 1005Hz
+#define RAD_TO_DEG (180.0f/3.14159265f)
 
 //COMPLEMENTARY FILTER
 #define TAU 0.5f
-#define ALPHA (TAU)/(TAU+DT)
+#define ALPHA ((TAU)/(TAU+DT))
 
 //GLOBAL VARIABLES
 static volatile float xl_roll, xl_pitch;
 static volatile float gx, gy, gz, ax, ay, az;
-static volatile float tx, ty, tz;
+static volatile float pitch, roll, yaw;
 volatile uint8_t log_ready = 0, log_count = 0;
 
 // INTERRUPTS
@@ -37,8 +38,16 @@ void TIM2_IRQHandler(void) {
 	xl_roll = atan2f(ay, az);
 	xl_pitch = atan2f(ax, sqrtf(ay*ay + az*az));
 
-	tx = ALPHA*(tx+gx*DT) + (1-ALPHA)*xl_roll;
-	ty = ALPHA*(ty+gy*DT) + (1-ALPHA)*xl_pitch;
+	roll = ALPHA*(roll+gx*DT) + (1-ALPHA)*xl_roll; //rad
+	pitch = ALPHA*(pitch+gy*DT) + (1-ALPHA)*xl_pitch; //rad
+
+	uint32_t time_ms = systick_get_ms();
+	if (time_ms > 5000 && time_ms <= 20000) pid_arm();
+	if (time_ms > 20000) pid_disarm();
+
+	if (pid_get_armed()) {
+		pid_handler(pitch*RAD_TO_DEG, roll*RAD_TO_DEG);
+	}
 
 	if (++log_count >= 10) { //1000Hz -> 100Hz for USART logging
 		log_ready = 1;
@@ -46,9 +55,27 @@ void TIM2_IRQHandler(void) {
 	}
 }
 
-void USART1_IRQHandler(void) { usart_rx(); }
+void USART1_IRQHandler(void) {
+	(void)USART1->SR;
+	(void)USART1->DR;
+	usart_rx();
+}
 
-void DMA2_Stream5_IRQHandler(void) { usart_rx(); }
+void DMA2_Stream5_IRQHandler(void) {
+	if (DMA2->HISR & DMA_HISR_HTIF5) {
+		DMA2->HIFCR = DMA_HIFCR_CHTIF5;
+		usart_rx();
+	}
+	if (DMA2->HISR & DMA_HISR_TCIF5) {
+		DMA2->HIFCR = DMA_HIFCR_CTCIF5;
+		usart_rx();
+	}
+}
+
+void DMA2_Stream7_IRQHandler(void) {
+	DMA2->HIFCR = DMA_HIFCR_CTCIF7;
+	usart_tx_queue_handler();
+}
 
 int main(void) {
 	//POWER ON & CONFIGURATION
@@ -70,15 +97,13 @@ int main(void) {
 	//START LOGGING
 	timer_init(); //Enable control loop and start recording data
 
-//	motor_output(FR, 0.1);
-
 	while (1) {
 		if (log_ready) {
 			//Send pitch and roll data via USART
 			log_ready = 0;
 		    static char str[80];
-		    uint16_t len = snprintf(str, 80, "%lu %.2f %.2f\n", systick_get_ms(), tx, ty);
-		    if (len<0) continue;
+//		    uint16_t len = snprintf(str, 80, "%lu %.2f\n", systick_get_ms(), motor_get(FL)->output);
+		    uint16_t len = snprintf(str, 80, "%lu %.5f %.5f\n", systick_get_ms(), pitch, roll);
 		    if (len>80) len = 80;
 		    usart_tx((uint8_t*)str, len);
 		}

@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define DT (1.0f/1005.0f)
+
 void timer_init(void);
 
 #endif /* INC_TIMER_H_ */

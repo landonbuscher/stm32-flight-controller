@@ -20,8 +20,8 @@ Peripheral lsm6dsr_peripheral = {
 static float GYRO_X_CAL, GYRO_Y_CAL, GYRO_Z_CAL;
 
 //XL calibration values obtained by measuring XL readouts at known orientations
-static float XL_X_OFFSET = 0.006027983333333209f;
-static float XL_Y_OFFSET = -0.02123634687499998f;
+static float XL_X_OFFSET = 0.023604970017f;
+static float XL_Y_OFFSET = -0.006748496689f;
 static float XL_Z_OFFSET = 0.014031421250000009f;
 static float XL_X_SCALE = 0.9924893666666667f;
 static float XL_Y_SCALE = 1.001926015625f;

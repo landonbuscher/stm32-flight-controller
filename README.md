@@ -1,14 +1,14 @@
 # STM32 Flight Controller - Bare-Metal Firmware
 Attitude estimation and motor control firmware for a quadcopter flight controller, written exclusively by reference of data sheets and reference manuals with no HAL abstraction.
 
-![Test bench setup including drone and flight controller](assets/board.JPG)
+![Test bench setup including drone and flight controller](assets/board.jpg)
 
 ***
 
 ### Overview
 This firmware reads a 6-axis IMU over SPI, fuses accelerometer and gyroscope data into a pitch and roll estimate using a complementary filter, and streams the result over USART for analysis. Every peripheral driver (clock tree, SPI, USART, timers, GPIO) was written from scratch using the respective documentation.
 
- **Current State:** *(Aug. 8 2025)* Attitude estimation and telemetry are working. Motor PWM output is configured but not yet controlled by the attitude estimation.
+ **Current State:** *(Aug. 8 2026)* Attitude estimation and telemetry are working. A pitch/roll PID controller with motor mixing and output saturating handling is implemented but not yet flight-tested or tuned.
  
 ***
 
@@ -31,14 +31,16 @@ This firmware reads a 6-axis IMU over SPI, fuses accelerometer and gyroscope dat
 | lps22hh.c | Configure barometer |
 | timer.c | Configure TIM2 as 1kHz control loop |
 | motor.c | Configure TIM4 CH1-4 as motor PWM outputs |
-| usart.c | Configure USART; send data via USART TX pin |
+| usart.c | Configure USART; DMA-driven TX with ring-buffered message queue |
 | systick.c | 1ms counter |
+| pid.c | Pitch/roll PID, motor mixing, output saturation handling, arm/disarm |
 
 ***
 
 ### Design Decisions
 * **Register-level drivers over HAL:** While HAL would've been faster to write, I chose to write all drivers at the register level to build my ability to comprehend and implement features by reference of technical documentation.
 * **Complementary Filter:** Using a complementary filter drastically simplified the attitude estimation and is sufficient for a slow indoor flight around my desk, though a Kalman filter is a logical next step when I want to improve handling in more technical environments, implement the barometer, and better handle the sensor noise.
+* **Preserving torque under saturation:** An edge case I discovered happened when one motor demanded more than 100% and another less than my minimum threshold of 10% power. Without correction, simply clamping the values to their high and low would change the power differential between motors, resulting in the attitude changing in unexpected ways. Instead, the mixer first tries to shift all four motors to ensure they are within the threshold. When the requested span exceeds the 10% to 100% threshold, the pitch and roll differentials are scaled by the same factor and shifted so that the attitude is controlled as intended. This is at the cost of altitude.
 
 ***
 
@@ -55,12 +57,16 @@ This firmware reads a 6-axis IMU over SPI, fuses accelerometer and gyroscope dat
 * Bare-metal SPI driver shared between two sensors
 * LSM6DSR configuration, calibration, unit conversion
 * 1 kHz complementary filter producing pitch and roll
-* 100 Hz USART telemetry
+* 100 Hz USART telemetry over a DMA TX queue
 * Motor output
+#### Implemented, pending hardware validation
+* Pitch/roll PID with motor mixing
+* Output saturation handling and integral anti-windup
+* Arm/disarm state machine
 #### In progress
 * Barometer integration for altitude readings
 #### Next
-* Safety features (arm, disarm)
 * RC receiver input
-* Motor mixing, PID controller
-
+* Kill switch, arm, disarm over RC receiver
+* Gain tuning for PID coefficients
+* Yaw axis implementation

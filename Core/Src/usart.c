@@ -1,7 +1,20 @@
+#include <string.h>
 #include "usart.h"
 #include "stm32f4xx.h"
 
 #define RX_LEN 128
+#define QUEUE_LEN 64
+#define TX_MSG_MAX 72
+
+typedef struct {
+	uint8_t buffer[TX_MSG_MAX];
+	uint16_t len;
+} instruction;
+static instruction queue[QUEUE_LEN] = {0};
+static volatile uint8_t head = 0, tail = 0, count = 0;
+static volatile uint8_t tx_busy = 0;
+static volatile uint32_t usart_tx_dropped = 0;
+
 static volatile uint8_t rx_buffer[RX_LEN];
 static volatile uint16_t bytes_read = 0;
 
@@ -42,14 +55,16 @@ void usart_init(void) {
 
 	//Enable DMA NVIC
 	NVIC_EnableIRQ(DMA2_Stream5_IRQn);
+	NVIC_EnableIRQ(DMA2_Stream7_IRQn);
 	NVIC_EnableIRQ(USART1_IRQn);
 
-	NVIC_SetPriority(DMA2_Stream5_IRQn, 0);
-	NVIC_SetPriority(USART1_IRQn, 0);
+	NVIC_SetPriority(DMA2_Stream5_IRQn, 1);
+	NVIC_SetPriority(DMA2_Stream7_IRQn, 1);
+	NVIC_SetPriority(USART1_IRQn, 1);
 
 	//DMA Configuration
 	DMA2_Stream5->CR = (DMA_SxCR_CHSEL_2 | DMA_SxCR_PL_1 | DMA_SxCR_MINC | DMA_SxCR_HTIE | DMA_SxCR_CIRC);
-	DMA2_Stream7->CR = (DMA_SxCR_CHSEL_2 | DMA_SxCR_PL_1 | DMA_SxCR_MINC | DMA_SxCR_DIR_0);
+	DMA2_Stream7->CR = (DMA_SxCR_CHSEL_2 | DMA_SxCR_PL_1 | DMA_SxCR_MINC | DMA_SxCR_TCIE | DMA_SxCR_DIR_0);
 
 	DMA2_Stream5->PAR = (uint32_t)&USART1->DR;
 	DMA2_Stream7->PAR = (uint32_t)&USART1->DR;
@@ -66,12 +81,44 @@ void usart_init(void) {
 	DMA2_Stream5->CR |= DMA_SxCR_EN;
 }
 
-void usart_tx(uint8_t* buffer, uint16_t len) {
-	if (DMA2_Stream7->CR & DMA_SxCR_EN) return; //DMA busy - TODO add queue
+static void usart_tx_start(void) {
+	if (tx_busy || count==0) return;
+	tx_busy = 1;
 	DMA2->HIFCR = DMA_HIFCR_CTCIF7 | DMA_HIFCR_CHTIF7 | DMA_HIFCR_CTEIF7 | DMA_HIFCR_CDMEIF7 | DMA_HIFCR_CFEIF7;
-	DMA2_Stream7->M0AR = (uint32_t)buffer;
-	DMA2_Stream7->NDTR = len;
+	DMA2_Stream7->M0AR = (uint32_t)queue[tail].buffer;
+	DMA2_Stream7->NDTR = queue[tail].len;
 	DMA2_Stream7->CR |= DMA_SxCR_EN;
+}
+
+void usart_tx(uint8_t* buffer, uint16_t len) {
+	if (len==0) return;
+	if (len>TX_MSG_MAX) len = TX_MSG_MAX;
+
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	if (count==QUEUE_LEN) {
+		usart_tx_dropped++;
+		__set_PRIMASK(primask);
+		return;
+	}
+	memcpy(queue[head].buffer, buffer, len);
+	queue[head].len = len;
+	count++;
+	if (++head == QUEUE_LEN) head = 0;
+	usart_tx_start();
+	__set_PRIMASK(primask);
+}
+
+void usart_tx_queue_handler(void) {
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	if (tx_busy) {
+		tx_busy = 0;
+		if (++tail == QUEUE_LEN) tail = 0;
+		count--;
+	}
+	usart_tx_start();
+	__set_PRIMASK(primask);
 }
 
 static void usart_rx_handler(uint16_t start_idx, uint16_t len) {

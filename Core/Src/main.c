@@ -24,7 +24,7 @@
 //GLOBAL VARIABLES
 static volatile float xl_roll, xl_pitch;
 static volatile float gx, gy, gz, ax, ay, az;
-static volatile float pitch, roll, yaw;
+static volatile float pitch, roll;
 volatile uint8_t log_ready = 0, log_count = 0;
 
 // INTERRUPTS
@@ -43,7 +43,7 @@ void TIM2_IRQHandler(void) {
 	pitch = ALPHA*(pitch+gy*DT) + (1-ALPHA)*xl_pitch; //rad
 
 	if (pid_get_armed()) {
-		pid_handler(pitch*RAD_TO_DEG, roll*RAD_TO_DEG);
+		pid_handler(pitch*RAD_TO_DEG, roll*RAD_TO_DEG, gy*RAD_TO_DEG, gx*RAD_TO_DEG, gz*RAD_TO_DEG);
 	}
 
 	if (++log_count >= 10) { //1000Hz -> 100Hz for USART logging

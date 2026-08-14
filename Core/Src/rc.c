@@ -1,3 +1,4 @@
+#include <math.h>
 #include "rc.h"
 #include "usart.h"
 #include "pid.h"
@@ -35,12 +36,18 @@ static void rc_input_handler(void) {
 	if (channel_odr[4] > 1750) {
 		//0-100 output
 		pid_arm();
-		float roll = ((channel_odr[0]-1000)/10.0f-50)/2.0f; //Divide by 2 = +-50deg -> +- 25deg control authority
+		float roll = ((channel_odr[0]-1000)/10.0f-50)/2.0f; //Divide by 5 = +-50deg -> +- 10deg control authority
 		float pitch  = ((channel_odr[1]-1000)/10.0f-50)/2.0f;
-		float throttle = (channel_odr[2]-1000)/10;
+		float throttle = (channel_odr[2]-1000)/10.0f;
+		float yaw = (channel_odr[3]-1500)/5.0f; //-100 to 100 deg/s
 		pid_set_throttle(throttle);
 		pid_set_pitch_setpoint(pitch);
 		pid_set_roll_setpoint(roll);
+		if (fabsf(yaw) >= 3) {
+			pid_set_yaw_setpoint(yaw);
+		} else {
+			pid_set_yaw_setpoint(0.0f);
+		}
 	} else {
 		pid_disarm();
 	}

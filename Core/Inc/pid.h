@@ -11,6 +11,7 @@ typedef struct {
 	float throttle;
 	float pitch;
 	float roll;
+	float yaw;
 	float pitch_setpoint;
 	float roll_setpoint;
 	float error_pitch;
@@ -34,5 +35,8 @@ void pid_handler(float, float);
 void pid_arm(void);
 void pid_disarm(void);
 uint8_t pid_get_armed(void);
+void pid_set_throttle(float);
+void pid_set_pitch_setpoint(float);
+void pid_set_roll_setpoint(float);
 
 #endif /* INC_PID_H_ */

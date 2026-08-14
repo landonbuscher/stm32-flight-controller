@@ -134,3 +134,15 @@ void pid_disarm(void) {
 uint8_t pid_get_armed(void) {
 	return armed;
 }
+
+void pid_set_throttle(float setpoint) {
+	pid.throttle = setpoint;
+}
+
+void pid_set_pitch_setpoint(float setpoint) {
+	pid.pitch_setpoint = setpoint;
+}
+
+void pid_set_roll_setpoint(float setpoint) {
+	pid.roll_setpoint = setpoint;
+}

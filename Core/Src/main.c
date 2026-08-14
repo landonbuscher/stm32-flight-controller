@@ -11,6 +11,7 @@
 #include "systick.h"
 #include "motor.h"
 #include "pid.h"
+#include "rc.h"
 
 //CONSTANTS
 #define DEG_TO_RAD (3.14159265f/180.0f)
@@ -40,10 +41,6 @@ void TIM2_IRQHandler(void) {
 
 	roll = ALPHA*(roll+gx*DT) + (1-ALPHA)*xl_roll; //rad
 	pitch = ALPHA*(pitch+gy*DT) + (1-ALPHA)*xl_pitch; //rad
-
-	uint32_t time_ms = systick_get_ms();
-	if (time_ms > 5000 && time_ms <= 20000) pid_arm();
-	if (time_ms > 20000) pid_disarm();
 
 	if (pid_get_armed()) {
 		pid_handler(pitch*RAD_TO_DEG, roll*RAD_TO_DEG);
@@ -94,18 +91,22 @@ int main(void) {
 	const char calib_msg[] = "# Calibration Complete\n";
 	usart_tx((uint8_t*)calib_msg, sizeof(calib_msg)-1);
 
-	//START LOGGING
-	timer_init(); //Enable control loop and start recording data
+	//SETUP TIMERS
+	timer_tim2_init(); //Enable control loop and start recording data
+	timer_tim5_init(); //Enable 1MHz clock for RC input
+
+	//Enable RC input
+	rc_init();
 
 	while (1) {
 		if (log_ready) {
 			//Send pitch and roll data via USART
 			log_ready = 0;
-		    static char str[80];
-//		    uint16_t len = snprintf(str, 80, "%lu %.2f\n", systick_get_ms(), motor_get(FL)->output);
-		    uint16_t len = snprintf(str, 80, "%lu %.5f %.5f\n", systick_get_ms(), pitch, roll);
-		    if (len>80) len = 80;
-		    usart_tx((uint8_t*)str, len);
+//		    static char str[80];
+////		    uint16_t len = snprintf(str, 80, "%lu %.2f\n", systick_get_ms(), motor_get(FL)->output);
+//		    uint16_t len = snprintf(str, 80, "%lu %.5f %.5f\n", systick_get_ms(), pitch, roll);
+//		    if (len>80) len = 80;
+//		    usart_tx((uint8_t*)str, len);
 		}
 		__WFI();
 	}
